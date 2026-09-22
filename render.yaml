@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: threat-assist-api
+    runtime: python
+    region: singapore
+    plan: free
+    # Root dir is the REPO root so "backend" package is importable
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: MONGODB_URI
+        value: mongodb://localhost:27017
+      - key: DATABASE_NAME
+        value: threat_assist
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        value: '["*"]'

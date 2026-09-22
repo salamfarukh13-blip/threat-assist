@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: threat_assist_mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=threat_assist
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: threat_assist_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - MONGODB_URI=mongodb://mongodb:27017
+      - DATABASE_NAME=threat_assist
+      - CORS_ORIGINS=["*"]
+    depends_on:
+      - mongodb
+
+volumes:
+  mongo_data:
