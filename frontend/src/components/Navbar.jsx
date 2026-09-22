@@ -55,11 +55,21 @@ export default function Navbar({ activeTab, setActiveTab, health }) {
           <div className="flex items-center space-x-3">
             <div className="hidden lg:flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-full px-3 py-1 text-xs font-mono">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  health?.status === 'healthy' ? 'bg-emerald-400' : health?.status === 'offline' ? 'bg-rose-400' : 'bg-amber-400'
+                }`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  health?.status === 'healthy' ? 'bg-emerald-500' : health?.status === 'offline' ? 'bg-rose-500' : 'bg-amber-500'
+                }`}></span>
               </span>
               <span className="text-slate-300">
-                DB: <span className="text-cyan-300 font-semibold">{health?.active_database?.includes('MongoDB') ? 'MongoDB Online' : 'Local Persistent JSON'}</span>
+                {health?.status === 'healthy' ? (
+                  <>DB: <span className="text-cyan-300 font-semibold">{health?.active_database?.includes('MongoDB') ? 'MongoDB Online' : 'Synthetic JSON'}</span></>
+                ) : health?.status === 'offline' ? (
+                  <span className="text-rose-400 font-semibold">Backend Offline</span>
+                ) : (
+                  <span className="text-amber-400 font-semibold">Connecting...</span>
+                )}
               </span>
             </div>
 
