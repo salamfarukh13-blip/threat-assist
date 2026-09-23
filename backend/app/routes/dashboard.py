@@ -23,8 +23,17 @@ async def get_dashboard_metrics():
     rels = await coll_rels.find()
 
     total_actors = len(actors)
-    total_footprints = len(fps)
     total_relationships = len(rels)
+
+    # Count digital footprints dynamically from actor data (PGP + wallets + domains + emails)
+    fp_count_from_actors = 0
+    for a in actors:
+        fp_count_from_actors += len(a.get("pgp_fingerprints") or [])
+        fp_count_from_actors += len(a.get("wallets") or [])
+        fp_count_from_actors += len(a.get("domains") or [])
+        fp_count_from_actors += len(a.get("emails") or [])
+        fp_count_from_actors += len(a.get("aliases") or [])
+    total_footprints = max(len(fps), fp_count_from_actors)
 
     critical_actors = sum(1 for a in actors if a.get("risk_level") == "critical")
     high_actors = sum(1 for a in actors if a.get("risk_level") == "high")

@@ -8,24 +8,109 @@ from backend.app.config import settings
 
 logger = logging.getLogger("threat_assist.db")
 
+
+def normalize_actor(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize any actor document to the standard app schema.
+    Handles both the synthetic schema (actor_id, primary_alias …) and
+    any externally-imported schema (Actor_ID, Primary_Handle …).
+    """
+    if "actor_id" in doc:
+        # Already correct schema — just ensure required list fields exist
+        doc.setdefault("aliases", [])
+        doc.setdefault("emails", [])
+        doc.setdefault("pgp_fingerprints", [])
+        doc.setdefault("wallets", [])
+        doc.setdefault("domains", [])
+        doc.setdefault("platforms", [])
+        return doc
+
+    # --- Map foreign schema fields to standard schema ---
+    actor_id = doc.get("Actor_ID") or doc.get("actor_id") or str(doc.get("_id", "UNKNOWN"))
+    primary_alias = (
+        doc.get("Primary_Handle")
+        or doc.get("primary_alias")
+        or doc.get("Handle")
+        or actor_id
+    )
+
+    # Derive risk_level from Attribution_Confidence or Category
+    confidence = doc.get("Attribution_Confidence", 0.5)
+    category = (doc.get("Category") or "").lower()
+    if isinstance(confidence, (int, float)) and confidence >= 0.85:
+        risk_level = "critical"
+    elif isinstance(confidence, (int, float)) and confidence >= 0.70:
+        risk_level = "high"
+    elif any(k in category for k in ["ransomware", "apt", "critical"]):
+        risk_level = "critical"
+    elif any(k in category for k in ["fraud", "malware", "high"]):
+        risk_level = "high"
+    else:
+        risk_level = "medium"
+
+    # Date normalization helper
+    def fmt_date(val):
+        if isinstance(val, datetime):
+            return val.strftime("%Y-%m-%d")
+        if isinstance(val, str) and val:
+            return val[:10]
+        return "2025-01-01"
+
+    normalized = {
+        "_id": doc.get("_id", ""),
+        "actor_id": actor_id,
+        "primary_alias": primary_alias,
+        "aliases": doc.get("aliases") or ([primary_alias] if primary_alias else []),
+        "emails": doc.get("emails") or [],
+        "pgp_fingerprints": doc.get("pgp_fingerprints") or [],
+        "wallets": doc.get("wallets") or [],
+        "domains": doc.get("domains") or [],
+        "platforms": doc.get("platforms") or [],
+        "language": doc.get("language") or doc.get("Language") or "Unknown",
+        "timezone": doc.get("timezone") or doc.get("Timezone") or "UTC+00:00",
+        "first_seen": fmt_date(doc.get("First_Observed") or doc.get("first_seen")),
+        "last_seen": fmt_date(doc.get("Last_Scan_Date") or doc.get("last_seen")),
+        "risk_level": risk_level,
+        "notes": (
+            doc.get("notes")
+            or f"{doc.get('Category', 'Threat Actor')} | Source: {doc.get('Source', 'Imported')} | "
+               f"Posts: {doc.get('Post_Count', 0)} | PGP keys: {doc.get('PGP_Count', 0)} | "
+               f"Wallets: {doc.get('Wallet_Count', 0)}"
+        ),
+    }
+    return normalized
+
 class MongoCollectionWrapper:
     """Unified wrapper around Motor AsyncIOMotorCollection for consistent async methods."""
-    def __init__(self, raw_collection):
+    def __init__(self, raw_collection, collection_name: str = ""):
         self.raw = raw_collection
+        self.collection_name = collection_name
+
+    def _normalize(self, doc: Dict[str, Any]) -> Dict[str, Any]:
+        if self.collection_name == "actors":
+            return normalize_actor(doc)
+        return doc
 
     async def find(self, query: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         cursor = self.raw.find(query or {})
         docs = await cursor.to_list(length=2000)
+        result = []
         for d in docs:
             if "_id" in d:
                 d["_id"] = str(d["_id"])
-        return docs
+            result.append(self._normalize(d))
+        return result
 
     async def find_one(self, query: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        # Try standard query first
         doc = await self.raw.find_one(query)
+        if doc is None and self.collection_name == "actors" and "actor_id" in query:
+            # Also search foreign-schema actors by Actor_ID
+            doc = await self.raw.find_one({"Actor_ID": query["actor_id"]})
         if doc and "_id" in doc:
             doc["_id"] = str(doc["_id"])
-        return doc
+        if doc:
+            return self._normalize(doc)
+        return None
 
     async def insert_one(self, doc: Dict[str, Any]):
         doc_copy = dict(doc)
@@ -214,7 +299,7 @@ class DatabaseManager:
     def get_collection(self, name: str):
         if self.mode == "mongodb" and self.mongo_db is not None:
             if name not in self.collections:
-                self.collections[name] = MongoCollectionWrapper(self.mongo_db[name])
+                self.collections[name] = MongoCollectionWrapper(self.mongo_db[name], collection_name=name)
             return self.collections[name]
         if name not in self.collections:
             self.collections[name] = LocalJSONCollection(name, self)

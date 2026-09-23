@@ -2,7 +2,7 @@ import { mockService } from './mockService';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -30,7 +30,7 @@ async function handleResponse(res) {
 export const api = {
   async getHealth() {
     try {
-      const res = await fetchWithTimeout(`${API_BASE}/health`, {}, 2500);
+      const res = await fetchWithTimeout(`${API_BASE}/health`, {}, 6000);
       return await handleResponse(res);
     } catch (err) {
       console.info('Backend unreachable, using standalone client-side engine.');

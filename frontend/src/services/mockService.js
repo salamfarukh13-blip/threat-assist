@@ -53,6 +53,17 @@ export const mockService = {
     const critical = actors.filter(a => a.risk_level === 'critical').length;
     const high = actors.filter(a => a.risk_level === 'high').length;
 
+    // Count fingerprints dynamically from actor data
+    let fpCountFromActors = 0;
+    actors.forEach(a => {
+      fpCountFromActors += (a.pgp_fingerprints || []).length;
+      fpCountFromActors += (a.wallets || []).length;
+      fpCountFromActors += (a.domains || []).length;
+      fpCountFromActors += (a.emails || []).length;
+      fpCountFromActors += (a.aliases || []).length;
+    });
+    const totalFps = Math.max(fps.length, fpCountFromActors);
+
     const platforms = {};
     actors.forEach(a => {
       (a.platforms || []).forEach(p => {
@@ -67,7 +78,7 @@ export const mockService = {
 
     return {
       total_actors: actors.length,
-      total_digital_footprints: fps.length,
+      total_digital_footprints: totalFps,
       total_relationships: rels.length,
       potential_connections: 5,
       risk_breakdown: {
