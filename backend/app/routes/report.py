@@ -19,20 +19,21 @@ async def generate_investigation_report(req: ReportRequest):
     comparison_data = None
     if req.actor_id_b:
         actor_b = await coll.find_one({"actor_id": req.actor_id_b})
-        if actor_b:
-            engine = IdentityMatchingEngine()
-            rule_res = engine.compare(actor_a, actor_b)
-            features = engine.extract_features(actor_a, actor_b)
-            ml_res = ml_model.predict_probability(features)
-            path = graph_analytics.find_path_between_actors(req.actor_id_a, req.actor_id_b)
-            combined_score = round(0.6 * rule_res["correlation_score"] + 0.4 * ml_res["ml_probability"], 1)
-            
-            comparison_data = {
-                "rule_based": rule_res,
-                "ml_model": ml_res,
-                "combined_score": combined_score,
-                "graph_path": path
-            }
+        if not actor_b:
+            raise HTTPException(status_code=404, detail="Actor B not found")
+        engine = IdentityMatchingEngine()
+        rule_res = engine.compare(actor_a, actor_b)
+        features = engine.extract_features(actor_a, actor_b)
+        ml_res = ml_model.predict_probability(features)
+        path = graph_analytics.find_path_between_actors(req.actor_id_a, req.actor_id_b)
+        combined_score = round(0.6 * rule_res["correlation_score"] + 0.4 * ml_res["ml_probability"], 1)
+        
+        comparison_data = {
+            "rule_based": rule_res,
+            "ml_model": ml_res,
+            "combined_score": combined_score,
+            "graph_path": path
+        }
 
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
