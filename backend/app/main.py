@@ -1,4 +1,11 @@
 import logging
+import os
+from dotenv import load_dotenv
+
+# Load backend/.env (see backend/.env.example) before settings are read.
+# Real environment variables (Render, Docker) still take priority.
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
