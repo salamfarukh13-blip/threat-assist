@@ -10,6 +10,6 @@
     "start": "npm --prefix frontend run dev"
   },
   "keywords": [],
-  "author": "",
+  "author": "Syed Salam Farukh",
   "license": "ISC"
 }
