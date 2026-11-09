@@ -22,9 +22,21 @@ async function handleResponse(res) {
       const data = await res.json();
       errorMsg = data.detail || errorMsg;
     } catch {}
-    throw new Error(errorMsg);
+    const err = new Error(errorMsg);
+    // 4xx = the backend is up and rejected the request (duplicate ID, not found,
+    // invalid data). Show that error instead of silently using the offline engine.
+    err.isClientError = res.status >= 400 && res.status < 500;
+    throw err;
   }
   return res.json();
+}
+
+// Use the client-side engine only when the backend is unreachable (network error,
+// timeout, 5xx while Render wakes up). Real validation errors are re-thrown so the
+// page can show them.
+function fallbackOrThrow(err, fallback) {
+  if (err && err.isClientError) throw err;
+  return fallback();
 }
 
 export const api = {
@@ -43,7 +55,7 @@ export const api = {
       const res = await fetchWithTimeout(`${API_BASE}/dashboard`);
       return await handleResponse(res);
     } catch (err) {
-      return mockService.getDashboard();
+      return fallbackOrThrow(err, () => mockService.getDashboard());
     }
   },
 
@@ -55,7 +67,7 @@ export const api = {
       const res = await fetchWithTimeout(`${API_BASE}/actors?${params.toString()}`);
       return await handleResponse(res);
     } catch (err) {
-      return mockService.getActors(search, risk);
+      return fallbackOrThrow(err, () => mockService.getActors(search, risk));
     }
   },
 
@@ -64,7 +76,7 @@ export const api = {
       const res = await fetchWithTimeout(`${API_BASE}/actors/${id}`);
       return await handleResponse(res);
     } catch (err) {
-      return mockService.getActor(id);
+      return fallbackOrThrow(err, () => mockService.getActor(id));
     }
   },
 
@@ -77,7 +89,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.createActor(actorData);
+      return fallbackOrThrow(err, () => mockService.createActor(actorData));
     }
   },
 
@@ -90,7 +102,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.updateActor(id, updateData);
+      return fallbackOrThrow(err, () => mockService.updateActor(id, updateData));
     }
   },
 
@@ -101,7 +113,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.deleteActor(id);
+      return fallbackOrThrow(err, () => mockService.deleteActor(id));
     }
   },
 
@@ -113,7 +125,7 @@ export const api = {
       const res = await fetchWithTimeout(`${API_BASE}/footprints?${params.toString()}`);
       return await handleResponse(res);
     } catch (err) {
-      return mockService.getFootprints(type, search);
+      return fallbackOrThrow(err, () => mockService.getFootprints(type, search));
     }
   },
 
@@ -126,7 +138,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.createFootprint(fpData);
+      return fallbackOrThrow(err, () => mockService.createFootprint(fpData));
     }
   },
 
@@ -137,7 +149,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.deleteFootprint(id);
+      return fallbackOrThrow(err, () => mockService.deleteFootprint(id));
     }
   },
 
@@ -146,7 +158,7 @@ export const api = {
       const res = await fetchWithTimeout(`${API_BASE}/relationships`);
       return await handleResponse(res);
     } catch (err) {
-      return mockService.getRelationships();
+      return fallbackOrThrow(err, () => mockService.getRelationships());
     }
   },
 
@@ -159,7 +171,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.createRelationship(relData);
+      return fallbackOrThrow(err, () => mockService.createRelationship(relData));
     }
   },
 
@@ -170,7 +182,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.deleteRelationship(id);
+      return fallbackOrThrow(err, () => mockService.deleteRelationship(id));
     }
   },
 
@@ -187,7 +199,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.compareIdentities(actorIdA, actorIdB, weights);
+      return fallbackOrThrow(err, () => mockService.compareIdentities(actorIdA, actorIdB, weights));
     }
   },
 
@@ -200,7 +212,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.quickMatch(query);
+      return fallbackOrThrow(err, () => mockService.quickMatch(query));
     }
   },
 
@@ -210,7 +222,7 @@ export const api = {
       const res = await fetchWithTimeout(url);
       return await handleResponse(res);
     } catch (err) {
-      return mockService.getGraph(actorId);
+      return fallbackOrThrow(err, () => mockService.getGraph(actorId));
     }
   },
 
@@ -223,7 +235,7 @@ export const api = {
       });
       return await handleResponse(res);
     } catch (err) {
-      return mockService.generateReport(reportPayload);
+      return fallbackOrThrow(err, () => mockService.generateReport(reportPayload));
     }
   }
 };
